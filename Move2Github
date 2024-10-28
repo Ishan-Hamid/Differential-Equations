@@ -1,0 +1,165 @@
+import numpy
+import numpy as np
+from matplotlib import pyplot as plt
+
+# Define all constants to be used in the simulation
+r_cb = 0.15  # Radius of cannonball in m
+rho_iron = 7874  # Density of iron in kg/m^3
+g = 9.81  # Acceleration due to gravity in m/s^2
+kappa = 0.47  # Drag coefficient of a sphere
+rho_air = 1.23  # Density of air in kg/m^3
+v0 = 125.00  # Initial speed in m/s
+
+def get_area(r):
+    ''' 
+    This function returns the cross section area of a sphere of radius r. The returned 
+    value is in the squared units of the unit of the radius argument.
+    '''
+    A = np.pi*r**2
+    return A
+
+def get_mass(r):
+    ''' 
+    This function returns the mass of an iron sphere of radius r. The radius 
+    should be given in meter and the return value is in kg.
+    '''
+    V = ((4/3)*np.pi*r**3)*rho_iron
+    return V
+
+area_cb = get_area(r_cb)
+mass_cb = get_mass(r_cb)
+
+def f(state, t):
+    '''Implements differential equation for cannonball from state vector r and time t'''
+    
+    # Unpack array of the state
+    x, y, vx, vy = state
+    
+    # these variables should updated in your code to be the derivatives of 
+    # the x, y positions and the derivative of the x, y velocities. 
+    dx_t, dy_dt, dvx_dt, dvy_dt = 0, 0, 0, 0
+    
+    m = rho_iron * (4/3)*np.pi*r_cb**3
+    vt = (vx**2+vy**2)**0.5
+    theta = np.arctan(vy/vx) #launch angle#
+    Fdrag = -0.5*(kappa*rho_air)*(vx**2+vy**2)*get_area(r_cb)
+    
+    dvy_dt = -(m*g-Fdrag*np.sin(theta))/m
+    dvx_dt = (Fdrag*np.cos(theta))/m
+    
+    dx_t = vx
+    dy_t = vy
+    
+    return numpy.array([dx_t, dy_t, dvx_dt, dvy_dt])
+
+def solve_euler(state_initial, t1, n_steps):
+    '''Solves ODE using Euler's method from state_initial to end time t1 using n_panels panels'''
+    dt = t1/n_steps
+    history = np.zeros((n_steps + 1, 4))
+    history[0] = state_initial
+    for i in range(n_steps):
+        history[i+1] = dt*f(history[i], dt) + history[i]
+    return history
+
+def find_zero_linear(x1, x2, y1, y2):
+    if y1*y2 > 0:
+        print("I expect y1 and y2 to have opposite signs!")
+    elif y1*y2 <= 0:
+        m = (y2-y1)/(x2-x1)
+        c = y1 -m*x1
+        b = -c/m 
+    return b
+
+def find_range(history):
+    all_xs = history[:,0]
+    all_ys = history[:,1]
+    negatives = numpy.argwhere(all_ys<0)
+    if len(negatives) == 0 :
+        print ("The projectile did not touch down! Returning the last known location")
+        return all_xs[-1]
+    (index,) = negatives[0]
+    y1, y2 = all_ys[index-1], all_ys[index]
+    x1, x2 = all_xs[index -1], all_xs[index]
+    return find_zero_linear(x1,x2,y1,y2)
+
+n_steps = 1000
+thetas = range(5, 90, 5)
+
+for i in thetas:
+    angles = i*np.pi/180
+    vx = 125*np.cos(angles)
+    vy = 125*np.sin(angles)
+    x0 = 0
+    y0 = 0
+
+    state = [x0,y0,vx,vy]
+    
+    direction = solve_euler(state, 30, n_steps)
+    x_values = direction[:,0]
+    y_values = direction[:,1]
+    plt.plot(x_values,y_values)
+    plt.legend([5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90],bbox_to_anchor = (1.05, 1.15))
+
+plt.title('ProjMotion Under Drag with Varying Theta (v0 = 125 m/s)')
+plt.xlabel('Horizontal Distance / m')
+plt.ylabel('Height / m')
+plt.ylim(0,750)
+plt.xlim(0,1400)
+
+plt.show()
+
+n_steps = 1000
+max_time = 300
+v0s = numpy.linspace(50, 1000, 20)
+degrees = 60
+rad = 60*np.pi/180
+
+def f2(state, t):
+    x, y, vx, vy = state
+    dx_t, dy_dt, dvx_dt, dvy_dt = 0, 0, 0, 0
+    m = rho_iron * (4/3)*np.pi*r_cb**3
+    vt = (vx**2+vy**2)**0.5
+    theta = np.arctan(vy/vx) 
+    dvy_dt = -g
+    dvx_dt = 0
+    dx_t = vx
+    dy_t = vy
+    return numpy.array([dx_t, dy_t, dvx_dt, dvy_dt])
+
+def solve_euler2(state_initial, t1, n_steps):
+    dt = t1/n_steps
+    history = np.zeros((n_steps + 1, 4))
+    history[0] = state_initial
+    for i in range(n_steps):
+        history[i+1] = dt*f2(history[i], dt) + history[i]
+    return history
+
+
+all_ranges = []
+all_ranges2 = []
+
+for i in v0s:
+    x1 = 0
+    y1 = 0
+    vx = i * np.cos(rad)
+    vy = i * np.sin(rad)
+    state = [x1, y1, vx, vy]
+    all_ranges = np.append(all_ranges,[find_range(solve_euler(state, max_time, n_steps))])
+    
+for j in v0s:
+    x2 = 0
+    y2 = 0
+    vx2 = j * np.cos(rad)
+    vy2 = j * np.sin(rad)
+    state2 = [x2, y2, vx2, vy2]
+    all_ranges2 = np.append(all_ranges2,[find_range(solve_euler2(state2, max_time, n_steps))])
+
+    
+
+plt.plot(v0s, all_ranges)
+plt.plot(v0s, all_ranges2)
+plt.legend(["Drag", "No Drag"])
+plt.title('Drag vs No Drag')
+plt.xlabel('Initial Velocities / m/s')
+plt.ylabel('Ranges / m')
+plt.show()
